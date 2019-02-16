@@ -168,10 +168,12 @@ class Window(QtWidgets.QMainWindow):
                 endlimit = i + self.borderLoops
                 self.fimg_original[i:endlimit, :] = 0
                 self.fimg_original[:, i:endlimit] = 0
-                j = -1 * (i + 1)
-                endlimit = j - self.borderLoops 
-                self.fimg_original[endlimit:j, :] = 0
-                self.fimg_original[:, endlimit:j] = 0
+                m2loba = self.fimg_original[::-1]
+                m2loba[i:endlimit, :] = 0
+                self.fimg_original = m2loba[::-1]
+                m2loba = np.fliplr(self.fimg_original)
+                m2loba[:, i:endlimit] = 0
+                self.fimg_original = np.fliplr(m2loba) 
                 i = i + self.borderLoops
 
                 self.img = np.fft.ifft2(self.fimg_original).real
