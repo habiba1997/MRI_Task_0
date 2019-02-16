@@ -14,15 +14,22 @@ from output import Ui_MainWindow
 
 class Window(QtWidgets.QMainWindow):
     changedValue = pyqtSignal()
+    invalidNumber = pyqtSignal()
+    bigNumber = pyqtSignal()
+    badNumber = pyqtSignal()
 
     def __init__(self):
         super(Window, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.ui.pushButton.clicked.connect(self.get_image)
+        self.ui.lineEdit.textChanged.connect(self.checkBorderLoops)
 
         # Making the connection
         self.changedValue.connect(self.changeProgressBarValue)
+        self.invalidNumber.connect(self.show_invalid_number_error)
+        self.bigNumber.connect(self.largeInput)
+        self.badNumber.connect(self.nonDivisibity)
 
         self.error_dialog = None
         self.divisibleError = None
@@ -45,8 +52,8 @@ class Window(QtWidgets.QMainWindow):
         self.step = 0
         self.ui.progressBar.setRange(0, 520)
 
-        self.borderLoops = 1 #for loop functions related to zerooing image
-        self.nonDivisible = 0 # related to divisibility
+        self.borderLoops = 1  # for loop functions related to zerooing image
+        self.nonDivisible = 0  # related to divisibility
 
         self.ui.pushButton_2.setText("Pause")
 
@@ -66,10 +73,25 @@ class Window(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def changeProgressBarValue(self):
-        if self.step >= 520:
-            self.step = 0
-        self.step = self.step + 1
         self.ui.progressBar.setValue(self.step)
+
+    @pyqtSlot()
+    def show_invalid_number_error(self):
+        self.show_error("دخل ارقام لو سمحت")
+
+    @pyqtSlot()
+    def nonDivisibity(self):
+
+        loops = int(self.ui.lineEdit.text())
+        dividible = 520 % loops
+        dividible = loops - dividible
+        self.show_error(
+            "This number is not divisible by 520 \n \n Hint: \n You could use " + str(dividible) + " instead")
+
+    @pyqtSlot()
+    def largeInput(self):
+        loops = int(self.ui.lineEdit.text())
+        self.show_error("Out Of Bound Input \n \n Hint: \n PLEASE choose a number smaller than 260")
 
     def closeEvent(self, *args, **kwargs):
         self.afra7_flag = False
@@ -113,18 +135,25 @@ class Window(QtWidgets.QMainWindow):
         if self.pause_flag:
             self.pause_flag = False
             threading.Thread(target=self.sho8l_afra7).start()
-    
-    def nonDivisibity(self, size):
-        
-        loops = (int)(self.ui.lineEdit.text())
-        dividible = (size*2) % loops
-        self.show_error("This number is not divisible by 520 \n \n Hint: \n You could use " + str(dividible) +  " instead")
-        self.pauseAndResume()
 
-    def largeInput(self):
-        loops = (int)(self.ui.lineEdit.text())
-        self.show_error("Out Of Bound Input \n \n Hint: \n PLEASE choose a number smaller than 260")
-        self.pauseAndResume()
+    def checkBorderLoops(self):
+        try:
+            self.borderLoops = int(self.ui.lineEdit.text())
+        except ValueError:
+            # self.show_error("اكتب ارقام بس لو سمحت")
+            self.invalidNumber.emit()
+            self.pauseAndResume()
+            return
+
+        if self.borderLoops > 260:
+            self.bigNumber.emit()
+            self.pauseAndResume()
+            return
+
+        # if size % self.borderLoops != 0:
+        #     self.badNumber.emit()
+        #     self.pauseAndResume()
+        #     return
 
     def sho8l_afra7(self):
         self.afra7_flag = True
@@ -133,17 +162,7 @@ class Window(QtWidgets.QMainWindow):
         size = math.floor(size)
 
         while True:
-            self.step =0
-            self.borderLoops = (int)(self.ui.lineEdit.text())
-            
-            if self.borderLoops > size :
-                self.largeInput()
-                return
-
-            if size % self.borderLoops != 0:
-                self.nonDivisibity(size)
-                return
-            
+            self.step = 0
 
             i = 0
             while i < size:
@@ -173,19 +192,15 @@ class Window(QtWidgets.QMainWindow):
                 self.fimg_original = m2loba[::-1]
                 m2loba = np.fliplr(self.fimg_original)
                 m2loba[:, i:endlimit] = 0
-                self.fimg_original = np.fliplr(m2loba) 
+                self.fimg_original = np.fliplr(m2loba)
                 i = i + self.borderLoops
 
                 self.img = np.fft.ifft2(self.fimg_original).real
                 self.fimg_copy = self.fimg_original.copy()
                 with self.lock:
                     self.show_images()
-                for loop in range(self.borderLoops):
-                    if (i - self.borderLoops + loop) < size:
-                        self.changedValue.emit()
-                if i > size:
-                    for loop in range(i - self.borderLoops, size):
-                        self.changedValue.emit()
+                self.step = i
+                self.changedValue.emit()
 
             self.fimg_original = self.fimg_const.copy()
             with self.lock:
@@ -208,7 +223,7 @@ class Window(QtWidgets.QMainWindow):
                     i = self.inner_loop_saved[0]
                     j = self.inner_loop_saved[1]
                     self.inner_loop_saved = None
-                    self.step = self.saveStep 
+                    self.step = self.saveStep
                     self.saveStep = None
 
                 j += self.borderLoops
@@ -218,13 +233,10 @@ class Window(QtWidgets.QMainWindow):
                 self.fimg_copy = self.fimg_original.copy()
                 with self.lock:
                     self.show_images()
-
-                for loop in range(self.borderLoops):
-                    self.changedValue.emit()
+                self.step = 260 + (260 - i)
+                self.changedValue.emit()
                 i -= self.borderLoops
-                if i < 0:
-                    for loop in (0, i + self.borderLoops):
-                        self.changedValue.emit()
+
                 # time.sleep(0.1)
 
             self.fimg_original = self.fimg_const.copy()
@@ -249,7 +261,6 @@ class Window(QtWidgets.QMainWindow):
         self.error_dialog.setText(error_message)
         self.error_dialog.setWindowTitle("OH NO")
         self.error_dialog.show()
-
 
 
 App = QApplication(sys.argv)
