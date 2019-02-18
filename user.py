@@ -104,7 +104,17 @@ class Window(QtWidgets.QMainWindow):
         self.show()
 
     def get_image(self):
+        paused_by_function = False
+        if self.img is not None and not self.pause_flag:
+            self.pauseAndResume()
+            paused_by_function = True
+
         fname = QFileDialog.getOpenFileName(self, 'Open file', '', "Image files (*.jpg *.gif)")
+        if fname[0] == '':
+            if self.img is not None and self.pause_flag and paused_by_function:
+                self.pauseAndResume()
+            return
+
         self.img = cv2.imread(fname[0], 0)
         if self.img is None:
             self.afra7_flag = False
@@ -115,6 +125,8 @@ class Window(QtWidgets.QMainWindow):
             return self.show_error("الابعاد دي متلزمناش يا ساحبي")
 
         self.afra7_flag = False
+        self.inner_loop_saved = None
+        self.outer_loop_saved = None
 
         self.ui.progressBar.setValue(0)
         self.step = 0
@@ -124,9 +136,12 @@ class Window(QtWidgets.QMainWindow):
         self.fimg_copy = self.fimg_original.copy()
         self.fimg_const = self.fimg_original.copy()
 
-        with self.lock:
-            self.show_images()
-            threading.Thread(target=self.sho8l_afra7).start()
+        if self.pause_flag and paused_by_function:
+            self.pauseAndResume()
+        else:
+            with self.lock:
+                self.show_images()
+                threading.Thread(target=self.sho8l_afra7).start()
 
     def pause(self):
         self.pause_flag = True
